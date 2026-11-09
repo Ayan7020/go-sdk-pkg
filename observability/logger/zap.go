@@ -63,7 +63,7 @@ func newZap(s Settings, console bool) (Logger, error) {
 		zap.AddStacktrace(zapcore.ErrorLevel))}, nil
 }
 
-func (z *zapLogger) Info() {}
+func (z *zapLogger) Info(msg string, field ...Fields) { z.l.Info(msg, mapToZapFields(field...)...) }
 
 func mapToZapFields(field ...Fields) []zap.Field {
 	if len(field) == 0 {

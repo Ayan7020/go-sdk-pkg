@@ -13,7 +13,7 @@ type Fields struct {
 }
 
 type Logger interface {
-	Info()
+	Info(msg string,field ...Fields)
 	// With(...Fields) Logger
 	// WithOtel()
 }
