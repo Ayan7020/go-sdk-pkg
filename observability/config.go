@@ -20,7 +20,7 @@ type settings struct {
 func defaultSettings(c Config) settings {
 	return settings{
 		Config:   c,
-		logger:   logger.NewZapJSON, // never nil
+		logger:   logger.NewZapJSON, // n 
 		// logLevel: logger.LevelInfo,
 		exporter: os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "",
 	}
