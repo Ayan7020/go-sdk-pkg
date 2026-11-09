@@ -1,6 +1,6 @@
 package observability
 
-import "github.com/kalento/go_api/pkg/observability/logger"
+import "github.com/Ayan7020/go-sdk-pkg/observability/logger"
 
 type Option func(*settings) error
 
@@ -14,7 +14,6 @@ func WithZapJSONLogger() Option {
 func WithZapConsoleLogger() Option {
 	return func(s *settings) error { s.logger = logger.NewZapConsole; return nil }
 }
- 
 
 // func WithLogLevel(l logger.Level) Option {
 // 	return func(s *settings) error { s.logLevel = l; return nil }

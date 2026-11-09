@@ -5,7 +5,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/kalento/go_api/pkg/observability/logger"
+	"github.com/Ayan7020/go-sdk-pkg/observability/logger"
 )
 
 func Init(ctx context.Context, cfg Config, opts ...Option) error {
@@ -20,29 +20,29 @@ func Init(ctx context.Context, cfg Config, opts ...Option) error {
 			return err
 		}
 	}
-  
+
 	res, err := resolveResouce(ctx, s)
 	if err != nil {
 		return err
 	}
 
-	lp,err := resolveLogger(ctx,s,res)
+	lp, err := resolveLogger(ctx, s, res)
 	if err != nil {
 		return err
 	}
 
 	log, err := s.logger(logger.Settings{
-		Service: s.ServiceName,
-		Version: s.Version,
-		Env:     s.Environment,
-		Output:  os.Stdout,
+		Service:  s.ServiceName,
+		Version:  s.Version,
+		Env:      s.Environment,
+		Output:   os.Stdout,
 		OtelLogs: lp,
 	})
 	if err != nil {
 		return err
 	}
 	logger.SetDefault(log)
-	
+
 	if err := resolveTracing(ctx, s, res); err != nil {
 		return err
 	}

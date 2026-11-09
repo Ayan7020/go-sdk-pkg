@@ -3,7 +3,7 @@ package observability
 import (
 	"os"
 
-	"github.com/kalento/go_api/pkg/observability/logger"
+	"github.com/Ayan7020/go-sdk-pkg/observability/logger"
 )
 
 type Config struct {
