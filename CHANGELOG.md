@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/Ayan7020/go-sdk-pkg/compare/v0.1.2...v0.2.0) (2026-11-11)
+
+
+### Features
+
+* add context-based tracing and improve zap logger methods ([bf57d68](https://github.com/Ayan7020/go-sdk-pkg/commit/bf57d68f3ce455c793366ca01762b884bc37552f))
+
 ## [0.1.2](https://github.com/Ayan7020/go-sdk-pkg/compare/v0.1.1...v0.1.2) (2026-11-10)
 
 
