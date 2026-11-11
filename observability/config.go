@@ -12,16 +12,16 @@ type Config struct {
 
 type settings struct {
 	Config
-	logger   logger.Factory
-	// logLevel any
-	exporter bool
+	ExporterEndpoint string
+	Insecure         bool
+	logger           logger.Factory
 }
 
 func defaultSettings(c Config) settings {
 	return settings{
-		Config:   c,
-		logger:   logger.NewZapJSON, // n dfdf
-		// logLevel: logger.LevelInfo,
-		exporter: os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "",
+		Config:           c,
+		logger:           logger.NewZapJSON,
+		Insecure:         false,
+		ExporterEndpoint: os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
 	}
 }

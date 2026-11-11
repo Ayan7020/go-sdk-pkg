@@ -3,7 +3,6 @@ package observability
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"go.opentelemetry.io/otel"
@@ -19,7 +18,7 @@ import (
 
 func resolveResouce(ctx context.Context, s settings) (*resource.Resource, error) {
 	r := resource.Default()
-	
+
 	CtxRes, err := resource.New(
 		ctx,
 		resource.WithAttributes(
@@ -38,12 +37,27 @@ func resolveResouce(ctx context.Context, s settings) (*resource.Resource, error)
 	return r, nil
 }
 
-func resolveTracing(ctx context.Context, s settings,res *resource.Resource) error {
+func resolveTracing(ctx context.Context, s settings, res *resource.Resource) error {
 	if res == nil {
 		return fmt.Errorf("failed to resolve Tracing! first initialized the resources")
 	}
 
-	exporter, err := otlptracegrpc.New(ctx)
+	var exporter sdktrace.SpanExporter
+	var err error
+	options := make([]otlptracegrpc.Option, 0, 2)
+	if strings.HasPrefix(s.ExporterEndpoint, "http") {
+		options = append(options, otlptracegrpc.WithEndpointURL(s.ExporterEndpoint))
+	} else if s.ExporterEndpoint != "" {
+		options = append(options, otlptracegrpc.WithEndpoint(s.ExporterEndpoint))
+	}
+	if s.Insecure {
+		options = append(options, otlptracegrpc.WithInsecure())
+	}
+	if len(options) > 0 {
+		exporter, err = otlptracegrpc.New(ctx, options...)
+	} else {
+		exporter, err = otlptracegrpc.New(ctx)
+	}
 	if err != nil {
 		return err
 	}
@@ -57,18 +71,29 @@ func resolveTracing(ctx context.Context, s settings,res *resource.Resource) erro
 	return nil
 }
 
-func resolveLogger(ctx context.Context, s settings,res *resource.Resource) (otellog.LoggerProvider,error) {
-	if !s.exporter {
-		return nil,nil
+func resolveLogger(ctx context.Context, s settings, res *resource.Resource) (otellog.LoggerProvider, error) {
+	if s.ExporterEndpoint == "" {
+		return nil, nil
 	}
-
 	var (
 		exp sdklog.Exporter
 		err error
-	) 
-	
-	if strings.HasPrefix(os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL"), "http") {
-		exp, err = otlploghttp.New(ctx)
+	)
+
+	if strings.HasPrefix(s.ExporterEndpoint, "http") {
+		options := make([]otlploghttp.Option, 0, 2)
+		options = append(options, otlploghttp.WithEndpointURL(s.ExporterEndpoint))
+		if s.Insecure {
+			options = append(options, otlploghttp.WithInsecure())
+		}
+		exp, err = otlploghttp.New(ctx, options...)
+	} else if s.ExporterEndpoint != "" {
+		options := make([]otlploggrpc.Option, 0, 2)
+		options = append(options, otlploggrpc.WithEndpoint(s.ExporterEndpoint))
+		if s.Insecure {
+			options = append(options, otlploggrpc.WithInsecure())
+		}
+		exp, err = otlploggrpc.New(ctx, options...)
 	} else {
 		exp, err = otlploggrpc.New(ctx)
 	}
@@ -76,11 +101,10 @@ func resolveLogger(ctx context.Context, s settings,res *resource.Resource) (otel
 	if err != nil {
 		return nil, fmt.Errorf("otlp log exporter: %w", err)
 	}
- 
+
 	lp := sdklog.NewLoggerProvider(
-		sdklog.WithResource(res),  
+		sdklog.WithResource(res),
 		sdklog.WithProcessor(sdklog.NewBatchProcessor(exp)),
 	)
 	return lp, nil
 }
- 

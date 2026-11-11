@@ -15,9 +15,10 @@ func WithZapConsoleLogger() Option {
 	return func(s *settings) error { s.logger = logger.NewZapConsole; return nil }
 }
 
-// func WithLogLevel(l logger.Level) Option {
-// 	return func(s *settings) error { s.logLevel = l; return nil }
-// }
-// func WithoutExporter() Option { // tests, local debugging
-// 	return func(s *settings) error { s.exporter = false; return nil }
-// }
+func WithExporterEndpoint(endpoint string) Option {
+	return func(s *settings) error { s.ExporterEndpoint = endpoint; return nil }
+}
+
+func WithInSecure() Option {
+	return func(s *settings) error { s.Insecure = true; return nil }
+} 
