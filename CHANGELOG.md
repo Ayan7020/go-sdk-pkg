@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/Ayan7020/go-sdk-pkg/compare/v0.3.0...v0.3.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* release.yaml ([10cd527](https://github.com/Ayan7020/go-sdk-pkg/commit/10cd5271c48f8981595a3a82619a2bf6e43dff62))
+
 ## [0.3.0](https://github.com/Ayan7020/go-sdk-pkg/compare/v0.2.0...v0.3.0) (2026-11-11)
 
 
