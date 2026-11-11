@@ -8,9 +8,13 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	otellog "go.opentelemetry.io/otel/log"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
@@ -25,6 +29,9 @@ func resolveResouce(ctx context.Context, s settings) (*resource.Resource, error)
 			semconv.ServiceName(s.ServiceName),
 			semconv.ServiceVersion(s.Version),
 			semconv.DeploymentEnvironmentName(s.Environment),
+			semconv.ServiceNamespace(s.ServiceNamespace),
+			semconv.ServiceInstanceID(s.ServiceInstanceID),
+			semconv.CloudRegion(s.DeploymentRegion),
 		),
 		resource.WithFromEnv(),
 		resource.WithProcess(),
@@ -37,38 +44,46 @@ func resolveResouce(ctx context.Context, s settings) (*resource.Resource, error)
 	return r, nil
 }
 
-func resolveTracing(ctx context.Context, s settings, res *resource.Resource) error {
+func resolveTracing(ctx context.Context, s settings, res *resource.Resource) (*sdktrace.TracerProvider, error) {
 	if res == nil {
-		return fmt.Errorf("failed to resolve Tracing! first initialized the resources")
+		return nil, fmt.Errorf("failed to resolve tracing: resources are not initialized")
 	}
 
 	var exporter sdktrace.SpanExporter
 	var err error
-	options := make([]otlptracegrpc.Option, 0, 2)
 	if strings.HasPrefix(s.ExporterEndpoint, "http") {
-		options = append(options, otlptracegrpc.WithEndpointURL(s.ExporterEndpoint))
-	} else if s.ExporterEndpoint != "" {
-		options = append(options, otlptracegrpc.WithEndpoint(s.ExporterEndpoint))
-	}
-	if s.Insecure {
-		options = append(options, otlptracegrpc.WithInsecure())
-	}
-	if len(options) > 0 {
-		exporter, err = otlptracegrpc.New(ctx, options...)
+		options := []otlptracehttp.Option{otlptracehttp.WithEndpointURL(s.ExporterEndpoint)}
+		if s.Insecure {
+			options = append(options, otlptracehttp.WithInsecure())
+		}
+		exporter, err = otlptracehttp.New(ctx, options...)
 	} else {
-		exporter, err = otlptracegrpc.New(ctx)
+		options := []otlptracegrpc.Option{otlptracegrpc.WithEndpoint(s.ExporterEndpoint)}
+		if s.Insecure {
+			options = append(options, otlptracegrpc.WithInsecure())
+		}
+		exporter, err = otlptracegrpc.New(ctx, options...)
 	}
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	batchOptions := make([]sdktrace.BatchSpanProcessorOption, 0, 2)
+	if s.batchTimeout > 0 {
+		batchOptions = append(batchOptions, sdktrace.WithBatchTimeout(s.batchTimeout))
+	}
+	if s.exportTimeout > 0 {
+		batchOptions = append(batchOptions, sdktrace.WithExportTimeout(s.exportTimeout))
 	}
 
 	traceProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
+		sdktrace.WithBatcher(exporter, batchOptions...),
 		sdktrace.WithResource(res),
+		sdktrace.WithSampler(s.sampler),
 	)
 
 	otel.SetTracerProvider(traceProvider)
-	return nil
+	return traceProvider, nil
 }
 
 func resolveLogger(ctx context.Context, s settings, res *resource.Resource) (otellog.LoggerProvider, error) {
@@ -81,21 +96,17 @@ func resolveLogger(ctx context.Context, s settings, res *resource.Resource) (ote
 	)
 
 	if strings.HasPrefix(s.ExporterEndpoint, "http") {
-		options := make([]otlploghttp.Option, 0, 2)
-		options = append(options, otlploghttp.WithEndpointURL(s.ExporterEndpoint))
+		options := []otlploghttp.Option{otlploghttp.WithEndpointURL(s.ExporterEndpoint)}
 		if s.Insecure {
 			options = append(options, otlploghttp.WithInsecure())
 		}
 		exp, err = otlploghttp.New(ctx, options...)
-	} else if s.ExporterEndpoint != "" {
-		options := make([]otlploggrpc.Option, 0, 2)
-		options = append(options, otlploggrpc.WithEndpoint(s.ExporterEndpoint))
+	} else {
+		options := []otlploggrpc.Option{otlploggrpc.WithEndpoint(s.ExporterEndpoint)}
 		if s.Insecure {
 			options = append(options, otlploggrpc.WithInsecure())
 		}
 		exp, err = otlploggrpc.New(ctx, options...)
-	} else {
-		exp, err = otlploggrpc.New(ctx)
 	}
 
 	if err != nil {
@@ -107,4 +118,48 @@ func resolveLogger(ctx context.Context, s settings, res *resource.Resource) (ote
 		sdklog.WithProcessor(sdklog.NewBatchProcessor(exp)),
 	)
 	return lp, nil
+}
+
+func resolveMetrics(ctx context.Context, s settings, res *resource.Resource) (*sdkmetric.MeterProvider, error) {
+	if res == nil {
+		return nil, fmt.Errorf("observability: resources are not initialized")
+	}
+
+	if s.ExporterEndpoint == "" {
+		return sdkmetric.NewMeterProvider(sdkmetric.WithResource(res)), nil
+	}
+
+	var (
+		exporter sdkmetric.Exporter
+		err      error
+	)
+	if strings.HasPrefix(s.ExporterEndpoint, "http") {
+		options := []otlpmetrichttp.Option{otlpmetrichttp.WithEndpointURL(s.ExporterEndpoint)}
+		if s.Insecure {
+			options = append(options, otlpmetrichttp.WithInsecure())
+		}
+		exporter, err = otlpmetrichttp.New(ctx, options...)
+	} else {
+		options := []otlpmetricgrpc.Option{otlpmetricgrpc.WithEndpoint(s.ExporterEndpoint)}
+		if s.Insecure {
+			options = append(options, otlpmetricgrpc.WithInsecure())
+		}
+		exporter, err = otlpmetricgrpc.New(ctx, options...)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("otlp metric exporter: %w", err)
+	}
+
+	readerOptions := make([]sdkmetric.PeriodicReaderOption, 0, 2)
+	if s.metricInterval > 0 {
+		readerOptions = append(readerOptions, sdkmetric.WithInterval(s.metricInterval))
+	}
+	if s.exportTimeout > 0 {
+		readerOptions = append(readerOptions, sdkmetric.WithTimeout(s.exportTimeout))
+	}
+
+	return sdkmetric.NewMeterProvider(
+		sdkmetric.WithResource(res),
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter, readerOptions...)),
+	), nil
 }

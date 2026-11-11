@@ -96,8 +96,14 @@ func mapToZapFields(field ...Fields) []zap.Field {
 			out[i] = zap.String(f.Key, v)
 		case int:
 			out[i] = zap.Int(f.Key, v)
+		case int64:
+			out[i] = zap.Int64(f.Key, v)
+		case float64:
+			out[i] = zap.Float64(f.Key, v)
 		case bool:
 			out[i] = zap.Bool(f.Key, v)
+		case error:
+			out[i] = zap.Error(v)
 		default:
 			out[i] = zap.Any(f.Key, v)
 		}
