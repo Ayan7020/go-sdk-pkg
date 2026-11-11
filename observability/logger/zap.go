@@ -60,10 +60,29 @@ func newZap(s Settings, console bool) (Logger, error) {
 		core,
 		zap.AddCaller(),
 		zap.AddCallerSkip(2),
-		zap.AddStacktrace(zapcore.ErrorLevel))}, nil
+		zap.AddStacktrace(zapcore.ErrorLevel),
+	).With(base...)}, nil
 }
 
-func (z *zapLogger) Info(msg string, field ...Fields) { z.l.Info(msg, mapToZapFields(field...)...) }
+func (z *zapLogger) Debug(msg string, field ...Fields) {
+	z.l.Debug(msg, mapToZapFields(field...)...)
+}
+
+func (z *zapLogger) Info(msg string, field ...Fields) {
+	z.l.Info(msg, mapToZapFields(field...)...)
+}
+
+func (z *zapLogger) Warn(msg string, field ...Fields) {
+	z.l.Warn(msg, mapToZapFields(field...)...)
+}
+
+func (z *zapLogger) Error(msg string, field ...Fields) {
+	z.l.Error(msg, mapToZapFields(field...)...)
+}
+
+func (z *zapLogger) With(field ...Fields) Logger {
+	return &zapLogger{l: z.l.With(mapToZapFields(field...)...)}
+}
 
 func mapToZapFields(field ...Fields) []zap.Field {
 	if len(field) == 0 {
@@ -79,6 +98,8 @@ func mapToZapFields(field ...Fields) []zap.Field {
 			out[i] = zap.Int(f.Key, v)
 		case bool:
 			out[i] = zap.Bool(f.Key, v)
+		default:
+			out[i] = zap.Any(f.Key, v)
 		}
 	}
 
