@@ -2,6 +2,7 @@ package observability
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Ayan7020/go-sdk-pkg/observability/logger"
@@ -23,10 +24,10 @@ func WithZapConsoleLogger() Option {
 
 func WithExporterEndpoint(endpoint string) Option {
 	return func(s *settings) error {
-		if endpoint == "" {
+		if strings.TrimSpace(endpoint) == "" {
 			return fmt.Errorf("observability: exporter endpoint cannot be empty")
 		}
-		s.ExporterEndpoint = endpoint
+		s.ExporterEndpoint = strings.TrimSpace(endpoint)
 		return nil
 	}
 }

@@ -20,10 +20,10 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 )
 
-func resolveResouce(ctx context.Context, s settings) (*resource.Resource, error) {
+func resolveResource(ctx context.Context, s settings) (*resource.Resource, error) {
 	r := resource.Default()
 
-	CtxRes, err := resource.New(
+	ctxResource, err := resource.New(
 		ctx,
 		resource.WithAttributes(
 			semconv.ServiceName(s.ServiceName),
@@ -36,10 +36,13 @@ func resolveResouce(ctx context.Context, s settings) (*resource.Resource, error)
 		resource.WithFromEnv(),
 		resource.WithProcess(),
 	)
-
-	r, err = resource.Merge(r, CtxRes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("observability: resolve resource: %w", err)
+	}
+
+	r, err = resource.Merge(r, ctxResource)
+	if err != nil {
+		return nil, fmt.Errorf("observability: merge resource: %w", err)
 	}
 	return r, nil
 }
@@ -49,9 +52,16 @@ func resolveTracing(ctx context.Context, s settings, res *resource.Resource) (*s
 		return nil, fmt.Errorf("failed to resolve tracing: resources are not initialized")
 	}
 
+	if s.ExporterEndpoint == "" {
+		return sdktrace.NewTracerProvider(
+			sdktrace.WithResource(res),
+			sdktrace.WithSampler(s.sampler),
+		), nil
+	}
+
 	var exporter sdktrace.SpanExporter
 	var err error
-	if strings.HasPrefix(s.ExporterEndpoint, "http") {
+	if isHTTPEndpoint(s.ExporterEndpoint) {
 		options := []otlptracehttp.Option{otlptracehttp.WithEndpointURL(s.ExporterEndpoint)}
 		if s.Insecure {
 			options = append(options, otlptracehttp.WithInsecure())
@@ -86,6 +96,11 @@ func resolveTracing(ctx context.Context, s settings, res *resource.Resource) (*s
 	return traceProvider, nil
 }
 
+func isHTTPEndpoint(endpoint string) bool {
+	return strings.HasPrefix(strings.ToLower(endpoint), "http://") ||
+		strings.HasPrefix(strings.ToLower(endpoint), "https://")
+}
+
 func resolveLogger(ctx context.Context, s settings, res *resource.Resource) (otellog.LoggerProvider, error) {
 	if s.ExporterEndpoint == "" {
 		return nil, nil
@@ -95,7 +110,7 @@ func resolveLogger(ctx context.Context, s settings, res *resource.Resource) (ote
 		err error
 	)
 
-	if strings.HasPrefix(s.ExporterEndpoint, "http") {
+	if isHTTPEndpoint(s.ExporterEndpoint) {
 		options := []otlploghttp.Option{otlploghttp.WithEndpointURL(s.ExporterEndpoint)}
 		if s.Insecure {
 			options = append(options, otlploghttp.WithInsecure())
@@ -133,7 +148,7 @@ func resolveMetrics(ctx context.Context, s settings, res *resource.Resource) (*s
 		exporter sdkmetric.Exporter
 		err      error
 	)
-	if strings.HasPrefix(s.ExporterEndpoint, "http") {
+	if isHTTPEndpoint(s.ExporterEndpoint) {
 		options := []otlpmetrichttp.Option{otlpmetrichttp.WithEndpointURL(s.ExporterEndpoint)}
 		if s.Insecure {
 			options = append(options, otlpmetrichttp.WithInsecure())

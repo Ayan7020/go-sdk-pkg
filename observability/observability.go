@@ -20,13 +20,16 @@ func Init(ctx context.Context, cfg Config, opts ...Option) (Shutdown, error) {
 
 	s := defaultSettings(cfg)
 	for _, opt := range opts {
+		if opt == nil {
+			return nil, errors.New("observability: nil option")
+		}
 		err := opt.apply(&s)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	res, err := resolveResouce(ctx, s)
+	res, err := resolveResource(ctx, s)
 	if err != nil {
 		return nil, err
 	}
@@ -55,11 +58,11 @@ func Init(ctx context.Context, cfg Config, opts ...Option) (Shutdown, error) {
 
 	meterProvider, err := resolveMetrics(ctx, s, res)
 	if err != nil {
-		_ = traceProvider.Shutdown(ctx)
+		cleanupErr := traceProvider.Shutdown(ctx)
 		if provider, ok := lp.(interface{ Shutdown(context.Context) error }); ok {
-			_ = provider.Shutdown(ctx)
+			cleanupErr = errors.Join(cleanupErr, provider.Shutdown(ctx))
 		}
-		return nil, err
+		return nil, errors.Join(err, cleanupErr)
 	}
 	otel.SetMeterProvider(meterProvider)
 

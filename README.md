@@ -60,7 +60,12 @@ func main() {
 ```
 
 `ServiceName` is required. If `ExporterEndpoint` is omitted, the SDK reads
-`OTEL_EXPORTER_OTLP_ENDPOINT`.
+`OTEL_EXPORTER_OTLP_ENDPOINT`. If neither is configured, the SDK still
+initializes local tracer and meter providers without exporting telemetry.
+
+Endpoints beginning with `http://` or `https://` use OTLP/HTTP; host-and-port
+endpoints use OTLP/gRPC. Use `Insecure: true` or `WithInsecure()` only for
+plaintext collector connections.
 
 For a plaintext collector connection, set `Insecure: true`:
 
