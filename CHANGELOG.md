@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/Ayan7020/go-sdk-pkg/compare/v0.3.1...v0.4.0) (2026-11-13)
+
+
+### Features
+
+* enhance observability SDK with OTLP metrics support and validation checks ([c81a7a1](https://github.com/Ayan7020/go-sdk-pkg/commit/c81a7a1f427b7b8c49c1056d03354b5bd9c5fa3b))
+
 ## [0.3.1](https://github.com/Ayan7020/go-sdk-pkg/compare/v0.3.0...v0.3.1) (2026-11-11)
 
 
